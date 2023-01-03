@@ -2,22 +2,26 @@ using System;
 using System.Linq;
 using System.Collections.Generic;
 
+using CsvHelper;
+using CsvHelper.Configuration;
+using CsvHelper.TypeConversion;
+
 namespace AdaCredit.Entities
 {
     // wrapper struct around a uint to handle parsing
     internal struct CPF : IEquatable<CPF>
     {
-        private uint val; // stores the first 9 digits of the tax number
+        public uint Number { get; private set; } // stores the first 9 digits of the tax number
 
         public CPF(uint cpf)
         {
             if (cpf >= 1_000_000_000)
             {
-                val = 0;
+                Number = 0;
                 return;
             }
 
-            val = cpf;
+            Number = cpf;
         }
 
         public static bool TryParse(string input, out CPF cpf)
@@ -44,17 +48,17 @@ namespace AdaCredit.Entities
             // just convert
             for (int i = 0; i < 9; i++)
             {
-                cpf.val *= 10;
-                cpf.val += (uint)digits[i];
+                cpf.Number *= 10;
+                cpf.Number += (uint)digits[i];
             }
             return true;
         }
 
         public override bool Equals(object? obj) => obj is CPF cpf && this.Equals(cpf);
 
-        public bool Equals(CPF cpf) => val == cpf.val;
+        public bool Equals(CPF cpf) => Number == cpf.Number;
 
-        public override int GetHashCode() => val.GetHashCode();
+        public override int GetHashCode() => Number.GetHashCode();
 
         public static bool operator ==(CPF lhs, CPF rhs) => lhs.Equals(rhs);
 
@@ -63,7 +67,7 @@ namespace AdaCredit.Entities
         public override string ToString()
         {
             // compute verifier digits
-            uint cpf = val;
+            uint cpf = Number;
             uint s1 = 0, s2 = 0;
             for (uint i = 9; i >= 1; i--)
             {
@@ -76,7 +80,22 @@ namespace AdaCredit.Entities
             s2 += 9 * s1;
             s2 %= 11; s2 %= 10;
 
-            return $"{val:000\\.000\\.000}-{s1}{s2}";
+            return $"{Number:000\\.000\\.000}-{s1}{s2}";
+        }
+    }
+
+    internal class CPFConverter : DefaultTypeConverter
+    {
+        public override object ConvertFromString(string? text, IReaderRow row, MemberMapData memberMapData)
+        {
+            uint.TryParse(text, out uint cpf);
+            return new CPF(cpf);
+        }
+
+        public override string ConvertToString(object? val, IWriterRow row, MemberMapData memberMapData)
+        {
+            if (val is null) { return ""; }
+            return ((CPF)val).Number.ToString();
         }
     }
 }
