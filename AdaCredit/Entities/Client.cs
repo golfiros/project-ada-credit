@@ -5,7 +5,14 @@ using CsvHelper.Configuration;
 namespace AdaCredit.Entities
 {
     using Extra;
-    internal class Client
+    internal class ClientBase
+    {
+        // records personal data
+        public string? Name { get; set; }
+        public CPF Cpf { get; init; }
+    }
+
+    internal class Client : ClientBase
     {
         public uint Branch { get; init; }
         public uint Account { get; init; }
@@ -16,8 +23,17 @@ namespace AdaCredit.Entities
         private decimal _balance;
         private bool _isActive;
 
-        public string? Name { get; set; }
-        public CPF Cpf { get; init; }
+        public Client() { }
+
+        public Client(ClientBase info)
+        {
+            foreach (var prop in info.GetType().GetProperties())
+            {
+                var newProp = this.GetType().GetProperty(prop.Name);
+                if (newProp is null) { continue; }
+                newProp.SetValue(this, prop.GetValue(info));
+            }
+        }
 
         public bool ModifyBalance(decimal delta)
         {

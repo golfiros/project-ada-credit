@@ -27,7 +27,23 @@ namespace AdaCredit.Data
             _data = new Dictionary<K, V>();
         }
 
-        public void Load() { }
+        public void Load()
+        {
+            _data.Clear();
+            using (var reader = new StreamReader(_filename))
+            using (var csv = new CsvReader(
+                reader,
+                new CsvConfiguration(CultureInfo.InvariantCulture)
+                {
+                    HasHeaderRecord = false
+                }
+            ))
+            {
+                csv.Context.RegisterClassMap<M>();
+                foreach (var record in csv.GetRecords<V>()) { _data.Add(_keygen(record), record); }
+            }
+        }
+
 
         public void Save()
         {
@@ -35,7 +51,11 @@ namespace AdaCredit.Data
             using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
             {
                 csv.Context.RegisterClassMap<M>();
-                foreach (var record in _data.Values) { csv.WriteRecord(record); }
+                foreach (var record in _data.Values)
+                {
+                    csv.WriteRecord(record);
+                    csv.NextRecord();
+                }
             }
         }
 
