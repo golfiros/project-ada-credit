@@ -59,6 +59,7 @@ namespace AdaCredit
 
             GenerateData(100, 250);
             ProcessTransactions();
+            PrintFailures();
         }
 
         private static void ProcessTransactions()
@@ -67,6 +68,7 @@ namespace AdaCredit
             clientDB.Load();
             foreach (var file in new DirectoryInfo(pendingDir).EnumerateFiles())
             {
+                // make sure we're looking at a decent filename
                 DateOnly date;
                 if (!DateOnly.TryParseExact(
                     file.Name.Replace(transactionPrefix, "").Replace(pendingSuffix, ""),
@@ -189,6 +191,7 @@ namespace AdaCredit
                     foreach (var record in failed)
                     {
                         csv.WriteRecord(record.Item1);
+                        csv.NextRecord();
                         var resultRecord = new { record = record.Item2 };
                         csv.WriteRecord(resultRecord);
                         csv.NextRecord();
@@ -199,6 +202,53 @@ namespace AdaCredit
                 file.Delete();
                 // save the client database
                 clientDB.Save();
+            }
+        }
+
+        private static void PrintFailures()
+        {
+            foreach (var file in new DirectoryInfo(failedDir).EnumerateFiles())
+            {
+                DateOnly date;
+                if (!DateOnly.TryParseExact(
+                    file.Name.Replace(transactionPrefix, "").Replace(failedSuffix, ""),
+                    "yyyyMMdd",
+                    out date
+                )) { continue; }
+                Console.WriteLine(date);
+                using (var reader = new StreamReader(file.FullName))
+                using (var csv = new CsvReader(
+                    reader,
+                    new CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = false
+                    }
+                ))
+                {
+                    csv.Context.RegisterClassMap<Entities.TransactionMap>();
+                    var resultRecord = new { record = default(Entities.TransactionResult) };
+                    while (csv.Read())
+                    {
+                        Console.WriteLine(csv.GetRecord<Entities.Transaction>());
+                        csv.Read();
+                        resultRecord = csv.GetRecord(resultRecord);
+                        if (resultRecord is null)
+                        {
+                            Console.WriteLine("Erro desconhecido");
+                            continue;
+                        }
+                        Console.WriteLine(
+                            resultRecord.record switch
+                            {
+                                Entities.TransactionResult.INVALID_SOURCE => "Conta de origem inválida",
+                                Entities.TransactionResult.INVALID_TARGET => "Conta de destino inválida",
+                                Entities.TransactionResult.INVALID_TYPE => "Tipo de transação inválido",
+                                Entities.TransactionResult.INSUFFICIENT_BALANCE => "Saldo insuficiente",
+                                _ => "Erro desconhecido"
+                            }
+                        );
+                    }
+                }
             }
         }
 
@@ -219,7 +269,7 @@ namespace AdaCredit
             {
                 var client = clientDB.NewClient(person);
                 // generate a random balance
-                client.ModifyBalance(Math.Truncate(100 * rnd.Decimal(0, 10000)) / 100);
+                client.ModifyBalance(Math.Truncate(100 * rnd.Decimal(0, 5000)) / 100);
                 // deactivate around 5% of accounts
                 if (rnd.Double() < 0.05) { client.Deactivate(); }
             }

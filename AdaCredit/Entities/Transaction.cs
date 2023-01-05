@@ -47,6 +47,14 @@ namespace AdaCredit.Entities
                 _ => throw new ArgumentOutOfRangeException(nameof(Type), $"Unexpected type value: {Type}")
             };
         }
+
+        public override string ToString()
+        {
+            return
+                $"b. {sBank:000} ag. {sBranch:0000} c.c. {sAccount:00000-0} -> " +
+                $"b. {tBank:000} ag. {tBranch:0000} c.c. {tAccount:00000-0} : " +
+                $"{Type} - R${Amount:F2}";
+        }
     }
 
     internal sealed class TransactionMap : ClassMap<Transaction>
