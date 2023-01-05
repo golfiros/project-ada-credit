@@ -57,15 +57,124 @@ namespace AdaCredit
                 Directory.CreateDirectory(failedDir);
             }
 
-            GenerateData(100, 250);
-            ProcessTransactions();
-            PrintFailures();
+            clientDB.Load();
+        }
+
+        private void AddClient()
+        {
+            // there's gotta be a better way to do this
+            // using reflection instead of just *knowing*
+            // the properties of ClientBase, but I couldn't
+            // figure it out
+
+            string? name;
+            Entities.CPF cpf;
+
+            Console.Write("Nome do cliente: ");
+            while ((name = Console.ReadLine()) is null || name == "")
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+            Console.Write("CPF do cliente: ");
+            while (!Entities.CPF.TryParse(Console.ReadLine(), out cpf))
+            {
+                Console.Write("Entrada inválida: ");
+            }
+            var client = clientDB.NewClient(new Entities.ClientBase { Name = name, Cpf = cpf });
+            Console.WriteLine($"Criado cliente de ag. {client.Branch:0000} e c.c. {client.Account:00000-0}");
+        }
+
+        private void PrintClient()
+        {
+            uint account;
+            Console.Write("Número da conta: ");
+            string? input;
+            while (
+                (input = Console.ReadLine()) is null ||
+                !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
+                account > 999_999)
+            {
+                Console.Write("Entrada inválida: ");
+            }
+            var client = clientDB.GetClient(1, account);
+            if (client is null)
+            {
+                Console.WriteLine("Cliente não encontrado");
+                return;
+            }
+            Console.WriteLine(client);
+        }
+
+        private void EditClient()
+        {
+            uint account;
+            Console.Write("Número da conta: ");
+            string? input;
+            while (
+                (input = Console.ReadLine()) is null ||
+                !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
+                account > 999_999)
+            {
+                Console.Write("Entrada inválida: ");
+            }
+            var client = clientDB.GetClient(1, account);
+            if (client is null)
+            {
+                Console.WriteLine("Cliente não encontrado");
+                return;
+            }
+            // again there must be a better way to do
+            // this with reflection
+        }
+
+        private void DeactivateClient()
+        {
+            uint account;
+            Console.Write("Número da conta: ");
+            string? input;
+            while (
+                (input = Console.ReadLine()) is null ||
+                !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
+                account > 999_999)
+            {
+                Console.Write("Entrada inválida: ");
+            }
+            var client = clientDB.GetClient(1, account);
+            if (client is null)
+            {
+                Console.WriteLine("Cliente não encontrado");
+                return;
+            }
+            client.Deactivate();
+            Console.WriteLine("Cliente desativado com sucesso");
+        }
+
+        private void AddUser()
+        {
+            string? user, pass, confirm;
+            Console.Write("Nome de usuário: ");
+            while ((user = Console.ReadLine()) is null || user == "")
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+
+            Console.Write("Senha: ");
+            while ((pass = Console.ReadLine()) is null)
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+
+            Console.Write("Confirme a senha: ");
+            while ((confirm = Console.ReadLine()) is null && confirm != pass)
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+
+            Console.WriteLine("Usuário cadastrado com sucesso");
         }
 
         private static void ProcessTransactions()
         {
-            // make sure the client database is loaded
-            clientDB.Load();
             foreach (var file in new DirectoryInfo(pendingDir).EnumerateFiles())
             {
                 // make sure we're looking at a decent filename
@@ -205,6 +314,24 @@ namespace AdaCredit
             }
         }
 
+        private static void PrintActiveClients()
+        {
+            foreach (var client in clientDB.Clients.Where(c => c.IsActive))
+            {
+                Console.WriteLine(client);
+            }
+        }
+
+        private static void PrintInactiveClients()
+        {
+            foreach (var client in clientDB.Clients.Where(c => c.IsActive))
+            {
+                Console.WriteLine(client);
+            }
+        }
+
+        private static void PrintActiveUsers() { }
+
         private static void PrintFailures()
         {
             foreach (var file in new DirectoryInfo(failedDir).EnumerateFiles())
@@ -249,6 +376,7 @@ namespace AdaCredit
                         );
                     }
                 }
+                Console.WriteLine();
             }
         }
 

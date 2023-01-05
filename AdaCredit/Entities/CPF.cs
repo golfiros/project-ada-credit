@@ -24,9 +24,10 @@ namespace AdaCredit.Entities
             Number = cpf;
         }
 
-        public static bool TryParse(string input, out CPF cpf)
+        public static bool TryParse(string? input, out CPF cpf)
         {
             cpf = new CPF(0);
+            if (input is null) { return false; }
             List<uint> digits = input.Where(Char.IsDigit).Select(m => uint.Parse(m.ToString())).ToList();
 
             // take care of obviously invalid entries

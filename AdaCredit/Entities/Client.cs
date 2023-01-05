@@ -8,7 +8,7 @@ namespace AdaCredit.Entities
     {
         // records personal data
         public string? Name { get; set; }
-        public CPF Cpf { get; init; }
+        public CPF Cpf { get; set; }
 
         public override string ToString()
         {
