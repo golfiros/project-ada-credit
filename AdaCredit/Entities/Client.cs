@@ -9,6 +9,13 @@ namespace AdaCredit.Entities
         // records personal data
         public string? Name { get; set; }
         public CPF Cpf { get; init; }
+
+        public override string ToString()
+        {
+            return
+                $"{Name}{Environment.NewLine}" +
+                $"CPF: {Cpf}{Environment.NewLine}";
+        }
     }
 
     internal class Client : ClientBase
@@ -48,8 +55,7 @@ namespace AdaCredit.Entities
             return
                 $"ag. {Branch:0000} c.c. {Account:00000-0} : " +
                 (_isActive ? $"R${_balance:F2}" : "(inativa)") +
-                $"{Environment.NewLine}{Name}{Environment.NewLine}" +
-                $"CPF: {Cpf}{Environment.NewLine}";
+                $"{Environment.NewLine}{base.ToString()}";
         }
     }
 

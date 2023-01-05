@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Collections.Generic;
 
 namespace AdaCredit.Data
@@ -15,6 +14,7 @@ namespace AdaCredit.Data
         public IEnumerable<Client> Clients => repo;
         public IEnumerable<(uint, uint)> Keys => repo.Keys;
 
+        public void Clear() => repo.Clear();
         public void Load() => repo.Load();
         public void Save() => repo.Save();
 
@@ -23,8 +23,6 @@ namespace AdaCredit.Data
             repo = new CsvRepository<(uint, uint), Client, ClientMap>(
                     filename, m => (m.Branch, m.Account)
                 );
-
-            if (!File.Exists(filename)) { using (var fs = File.Create(filename)) { } }
         }
 
         public Client NewClient(ClientBase info)

@@ -12,6 +12,7 @@ namespace AdaCredit.Data
 
         void Load();
         void Save();
+        void Clear();
 
         bool ContainsKey(K key);
         bool Add(V val);

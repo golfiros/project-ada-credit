@@ -21,6 +21,8 @@ namespace AdaCredit.Data
 
         public CsvRepository(string filename, Func<V, K> keygen)
         {
+            if (!File.Exists(filename)) { using (var fs = File.Create(filename)) { } }
+
             _filename = filename;
             _keygen = keygen;
 
@@ -29,9 +31,11 @@ namespace AdaCredit.Data
 
         public IEnumerable<K> Keys => _data.Keys;
 
+        public void Clear() => _data.Clear();
+
         public void Load()
         {
-            _data.Clear();
+            Clear();
             using (var reader = new StreamReader(_filename))
             using (var csv = new CsvReader(
                 reader,
