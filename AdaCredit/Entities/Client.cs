@@ -4,7 +4,6 @@ using CsvHelper.Configuration;
 
 namespace AdaCredit.Entities
 {
-    using Extra;
     internal class ClientBase
     {
         // records personal data

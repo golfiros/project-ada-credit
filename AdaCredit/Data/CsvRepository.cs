@@ -27,6 +27,8 @@ namespace AdaCredit.Data
             _data = new Dictionary<K, V>();
         }
 
+        public IEnumerable<K> Keys => _data.Keys;
+
         public void Load()
         {
             _data.Clear();

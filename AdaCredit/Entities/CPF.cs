@@ -6,7 +6,7 @@ using CsvHelper;
 using CsvHelper.Configuration;
 using CsvHelper.TypeConversion;
 
-namespace AdaCredit.Extra
+namespace AdaCredit.Entities
 {
     // wrapper struct around a uint to handle parsing
     internal struct CPF : IEquatable<CPF>

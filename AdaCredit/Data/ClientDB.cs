@@ -12,25 +12,22 @@ namespace AdaCredit.Data
 
         private IRepository<(uint, uint), Client> repo;
 
-        public IEnumerable<Client> Data => repo;
+        public IEnumerable<Client> Clients => repo;
+        public IEnumerable<(uint, uint)> Keys => repo.Keys;
 
         public void Load() => repo.Load();
         public void Save() => repo.Save();
 
-        public ClientDB()
+        public ClientDB(string filename)
         {
-            string filename = "client_db.csv";
-
             repo = new CsvRepository<(uint, uint), Client, ClientMap>(
                     filename, m => (m.Branch, m.Account)
                 );
 
             if (!File.Exists(filename)) { using (var fs = File.Create(filename)) { } }
-
-            repo.Load();
         }
 
-        public void NewClient(ClientBase info)
+        public Client NewClient(ClientBase info)
         {
             uint newAccount;
             for (
@@ -47,6 +44,9 @@ namespace AdaCredit.Data
                 IsActive = true
             };
             repo.Add(client);
+            return client;
         }
+
+        public Client? GetClient(uint Branch, uint Account) => repo.Get((Branch, Account));
     }
 }
