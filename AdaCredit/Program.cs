@@ -9,6 +9,8 @@ using Bogus;
 using CsvHelper;
 using CsvHelper.Configuration;
 
+using ConsoleTools;
+
 namespace AdaCredit
 {
     public class Program
@@ -58,14 +60,88 @@ namespace AdaCredit
             }
 
             clientDB.Load();
+
+            var clientMenu = new ConsoleMenu(args, level: 1)
+                .Add("Cadastrar novo cliente", AddClient)
+                .Add("Consultar dados de cliente existente", PrintClient)
+                .Add("Alterar o cadastro de cliente existente", EditClient)
+                .Add("Desativar cadastro de cliente existente", DeactivateClient)
+                .Add("Voltar", ConsoleMenu.Close)
+                .Configure(config =>
+                {
+                    config.Title = "Clientes";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                });
+
+            var userMenu = new ConsoleMenu(args, level: 1)
+                .Add("Cadastrar novo funcionário", AddUser)
+                .Add("Alterar senha de funcionário existente", EditUser)
+                .Add("Desativar cadastro de funcionário existente", DeactivateUser)
+                .Add("Voltar", ConsoleMenu.Close)
+                .Configure(config =>
+                {
+                    config.Title = "Funcionários";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                });
+
+            var dataMenu = new ConsoleMenu(args, level: 1)
+                .Add("Exibir clientes ativos", PrintActiveClients)
+                .Add("Exibir clientes inativos", PrintInactiveClients)
+                .Add("Exibir funcionários ativos", PrintActiveUsers)
+                .Add("Exibir transações com erro", PrintFailures)
+                .Add("Voltar", ConsoleMenu.Close)
+                .Configure(config =>
+                {
+                    config.Title = "Relatórios";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                });
+
+            var genMenu = new ConsoleMenu(args, level: 1)
+                .Add("Não", ConsoleMenu.Close)
+                .Add("Sim", (m) => { GenerateData(100, 300); m.CloseMenu(); })
+                .Configure(config =>
+                {
+                    config.Title = "Gerar novos dados vai apagar todos os dados existentes. Deseja continuar?";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                });
+
+            var mainMenu = new ConsoleMenu(args, level: 0)
+                .Add("Clientes", clientMenu.Show)
+                .Add("Funcionários", userMenu.Show)
+                .Add("Processar Transações", ProcessTransactions)
+                .Add("Relatórios", dataMenu.Show)
+                .Add("Gerar Dados", genMenu.Show)
+                .Add("Sair", () => Environment.Exit(0))
+                .Configure(config =>
+                {
+                    config.Title = $"Bem vindo {"usuario"}, escolha uma opção:";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                });
+
+            mainMenu.Show();
         }
 
-        private void AddClient()
+        private static void AddClient()
         {
             // there's gotta be a better way to do this
             // using reflection instead of just *knowing*
             // the properties of ClientBase, but I couldn't
             // figure it out
+
+            // that's mostly the reason why I have so few
+            // personal info properties in the first place
+
+            Console.Clear();
 
             string? name;
             Entities.CPF cpf;
@@ -81,11 +157,16 @@ namespace AdaCredit
                 Console.Write("Entrada inválida: ");
             }
             var client = clientDB.NewClient(new Entities.ClientBase { Name = name, Cpf = cpf });
+            clientDB.Save();
             Console.WriteLine($"Criado cliente de ag. {client.Branch:0000} e c.c. {client.Account:00000-0}");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
-        private void PrintClient()
+        private static void PrintClient()
         {
+            Console.Clear();
+
             uint account;
             Console.Write("Número da conta: ");
             string? input;
@@ -100,13 +181,19 @@ namespace AdaCredit
             if (client is null)
             {
                 Console.WriteLine("Cliente não encontrado");
+                Console.WriteLine("Pressione qualquer tecla para continuar");
+                Console.ReadKey();
                 return;
             }
             Console.WriteLine(client);
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
-        private void EditClient()
+        private static void EditClient()
         {
+            Console.Clear();
+
             uint account;
             Console.Write("Número da conta: ");
             string? input;
@@ -121,14 +208,56 @@ namespace AdaCredit
             if (client is null)
             {
                 Console.WriteLine("Cliente não encontrado");
+                Console.WriteLine("Pressione qualquer tecla para continuar");
+                Console.ReadKey();
                 return;
             }
             // again there must be a better way to do
             // this with reflection
+
+            new ConsoleMenu()
+                .Add("Nome", (m) =>
+                {
+                    Console.Clear();
+                    string? name;
+                    Console.Write("Novo nome do cliente: ");
+                    while ((name = Console.ReadLine()) is null || name == "")
+                    {
+                        Console.WriteLine("Entrada inválida: ");
+                    }
+                    client.Name = name;
+                    m.CloseMenu();
+                })
+                .Add("CPF", (m) =>
+                {
+                    Console.Clear();
+                    Entities.CPF cpf;
+                    Console.Write("Novo CPF do cliente: ");
+                    while (!Entities.CPF.TryParse(Console.ReadLine(), out cpf))
+                    {
+                        Console.Write("Entrada inválida: ");
+                    }
+                    client.Cpf = cpf;
+                    m.CloseMenu();
+                })
+                .Configure(config =>
+                {
+                    config.Title = "Selecione um dado para alterar";
+                    config.EnableWriteTitle = true;
+                    config.EnableBreadcrumb = false;
+                    config.WriteHeaderAction = () => { };
+                })
+                .Show();
+            clientDB.Save();
+            Console.WriteLine("Cadastro alterado com sucesso");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
-        private void DeactivateClient()
+        private static void DeactivateClient()
         {
+            Console.Clear();
+
             uint account;
             Console.Write("Número da conta: ");
             string? input;
@@ -143,14 +272,21 @@ namespace AdaCredit
             if (client is null)
             {
                 Console.WriteLine("Cliente não encontrado");
+                Console.WriteLine("Pressione qualquer tecla para continuar");
+                Console.ReadKey();
                 return;
             }
             client.Deactivate();
+            clientDB.Save();
             Console.WriteLine("Cliente desativado com sucesso");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
-        private void AddUser()
+        private static void AddUser()
         {
+            Console.Clear();
+
             string? user, pass, confirm;
             Console.Write("Nome de usuário: ");
             while ((user = Console.ReadLine()) is null || user == "")
@@ -171,7 +307,13 @@ namespace AdaCredit
             }
 
             Console.WriteLine("Usuário cadastrado com sucesso");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
+
+        private static void EditUser() { }
+
+        private static void DeactivateUser() { }
 
         private static void ProcessTransactions()
         {
@@ -316,24 +458,31 @@ namespace AdaCredit
 
         private static void PrintActiveClients()
         {
+            Console.Clear();
             foreach (var client in clientDB.Clients.Where(c => c.IsActive))
             {
                 Console.WriteLine(client);
             }
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
         private static void PrintInactiveClients()
         {
-            foreach (var client in clientDB.Clients.Where(c => c.IsActive))
+            Console.Clear();
+            foreach (var client in clientDB.Clients.Where(c => !c.IsActive))
             {
                 Console.WriteLine(client);
             }
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
         private static void PrintActiveUsers() { }
 
         private static void PrintFailures()
         {
+            Console.Clear();
             foreach (var file in new DirectoryInfo(failedDir).EnumerateFiles())
             {
                 DateOnly date;
@@ -378,6 +527,8 @@ namespace AdaCredit
                 }
                 Console.WriteLine();
             }
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
         }
 
         private static void GenerateData(int nClients, int nTransactions)
