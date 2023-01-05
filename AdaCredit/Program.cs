@@ -6,6 +6,9 @@ using System.Collections.Generic;
 
 using Bogus;
 
+using CsvHelper;
+using CsvHelper.Configuration;
+
 namespace AdaCredit
 {
     public class Program
@@ -38,7 +41,7 @@ namespace AdaCredit
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("Hello World");
+            Console.WriteLine("Sistema bancário Ada Credit");
 
             // make sure all necessary directories exist
             if (!Directory.Exists(pendingDir))
@@ -55,6 +58,148 @@ namespace AdaCredit
             }
 
             GenerateData(100, 250);
+            ProcessTransactions();
+        }
+
+        private static void ProcessTransactions()
+        {
+            // make sure the client database is loaded
+            clientDB.Load();
+            foreach (var file in new DirectoryInfo(pendingDir).EnumerateFiles())
+            {
+                DateOnly date;
+                if (!DateOnly.TryParseExact(
+                    file.Name.Replace(transactionPrefix, "").Replace(pendingSuffix, ""),
+                    "yyyyMMdd",
+                    out date
+                )) { continue; }
+
+                List<Entities.Transaction> pending;
+                using (var reader = new StreamReader(file.FullName))
+                using (var csv = new CsvReader(
+                    reader,
+                    new CsvConfiguration(CultureInfo.InvariantCulture)
+                    {
+                        HasHeaderRecord = false
+                    }
+                ))
+                {
+                    csv.Context.RegisterClassMap<Entities.TransactionMap>();
+                    pending = csv.GetRecords<Entities.Transaction>().ToList();
+                }
+                var completed = new List<Entities.Transaction>();
+                var failed = new List<(Entities.Transaction, Entities.TransactionResult)>();
+
+                foreach (var transaction in pending)
+                {
+                    Entities.Client? source, target;
+                    if (transaction.sBank != bankCode && transaction.tBank != bankCode)
+                    {
+                        completed.Add(transaction);
+                        continue;
+                    }
+                    if (transaction.sBank != bankCode)
+                    {
+                        target = clientDB.GetClient(transaction.tBranch, transaction.tAccount);
+                        if (target is null || !target.IsActive)
+                        {
+                            failed.Add((transaction, Entities.TransactionResult.INVALID_TARGET));
+                            continue;
+                        }
+                        if (transaction.Type == Entities.TransactionType.TEF)
+                        {
+                            failed.Add((transaction, Entities.TransactionResult.INVALID_TYPE));
+                            continue;
+                        }
+                        target.ModifyBalance(transaction.Amount);
+                        completed.Add(transaction);
+                        continue;
+                    }
+                    if (transaction.tBank != bankCode)
+                    {
+                        source = clientDB.GetClient(transaction.sBranch, transaction.sAccount);
+                        if (source is null || !source.IsActive)
+                        {
+                            failed.Add((transaction, Entities.TransactionResult.INVALID_SOURCE));
+                            continue;
+                        }
+                        if (transaction.Type == Entities.TransactionType.TEF)
+                        {
+                            failed.Add((transaction, Entities.TransactionResult.INVALID_TYPE));
+                            continue;
+                        }
+                        if (!source.ModifyBalance(-(transaction.Amount + transaction.Tariff(date))))
+                        {
+                            failed.Add((transaction, Entities.TransactionResult.INSUFFICIENT_BALANCE));
+                            continue;
+                        }
+                        completed.Add(transaction);
+                        continue;
+                    }
+                    source = clientDB.GetClient(transaction.sBranch, transaction.sAccount);
+                    if (source is null || !source.IsActive)
+                    {
+                        failed.Add((transaction, Entities.TransactionResult.INVALID_SOURCE));
+                        continue;
+                    }
+                    target = clientDB.GetClient(transaction.tBranch, transaction.tAccount);
+                    if (target is null || !target.IsActive)
+                    {
+                        failed.Add((transaction, Entities.TransactionResult.INVALID_TARGET));
+                        continue;
+                    }
+                    if (!source.ModifyBalance(-(transaction.Amount + transaction.Tariff(date))))
+                    {
+                        failed.Add((transaction, Entities.TransactionResult.INSUFFICIENT_BALANCE));
+                        continue;
+                    }
+                    target.ModifyBalance(transaction.Amount);
+                    completed.Add(transaction);
+                    continue;
+                }
+
+                // now we write the completed and failed transactions to files
+                string completedFile = Path.Join(
+                    completedDir,
+                    transactionPrefix +
+                    date.ToString("yyyyMMdd") +
+                    completedSuffix
+                );
+                using (var writer = new StreamWriter(completedFile))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.Context.RegisterClassMap<Entities.TransactionMap>();
+                    foreach (var record in completed)
+                    {
+                        csv.WriteRecord(record);
+                        csv.NextRecord();
+                    }
+                }
+
+                string failedFile = Path.Join(
+                    failedDir,
+                    transactionPrefix +
+                    date.ToString("yyyyMMdd") +
+                    failedSuffix
+                );
+                using (var writer = new StreamWriter(failedFile))
+                using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+                {
+                    csv.Context.RegisterClassMap<Entities.TransactionMap>();
+                    foreach (var record in failed)
+                    {
+                        csv.WriteRecord(record.Item1);
+                        var resultRecord = new { record = record.Item2 };
+                        csv.WriteRecord(resultRecord);
+                        csv.NextRecord();
+                    }
+                }
+
+                // delete the original transaction file
+                file.Delete();
+                // save the client database
+                clientDB.Save();
+            }
         }
 
         private static void GenerateData(int nClients, int nTransactions)
@@ -169,7 +314,7 @@ namespace AdaCredit
                     pendingSuffix
                 );
                 using (var reader = new StreamWriter(filename))
-                using (var csv = new CsvHelper.CsvWriter(reader, CultureInfo.InvariantCulture))
+                using (var csv = new CsvWriter(reader, CultureInfo.InvariantCulture))
                 {
                     csv.Context.RegisterClassMap<Entities.TransactionMap>();
                     foreach (var record in dailyTransactions[i])

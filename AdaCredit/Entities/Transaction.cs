@@ -1,7 +1,17 @@
+using System;
+
 using CsvHelper.Configuration;
 
 namespace AdaCredit.Entities
 {
+    enum TransactionResult
+    {
+        INVALID_SOURCE,
+        INVALID_TARGET,
+        INVALID_TYPE,
+        INSUFFICIENT_BALANCE
+    }
+
     enum TransactionType
     {
         TED,
@@ -22,6 +32,21 @@ namespace AdaCredit.Entities
         public TransactionType Type { get; init; }
 
         public decimal Amount { get; init; }
+
+        public decimal Tariff(DateOnly date)
+        {
+            if (date < new DateOnly(2022, 12, 01))
+            {
+                return 0;
+            }
+            return Type switch
+            {
+                TransactionType.TED => 5m,
+                TransactionType.DOC => 1m + Math.Min(5m, Amount * 0.01m),
+                TransactionType.TEF => 0m,
+                _ => throw new ArgumentOutOfRangeException(nameof(Type), $"Unexpected type value: {Type}")
+            };
+        }
     }
 
     internal sealed class TransactionMap : ClassMap<Transaction>
