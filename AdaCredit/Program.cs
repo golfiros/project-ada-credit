@@ -18,6 +18,7 @@ namespace AdaCredit
         private static uint bankCode = 777;
 
         private static Data.ClientDB clientDB = new Data.ClientDB("client_db.csv");
+        private static Data.UserDB userDB = new Data.UserDB("user_db.csv");
 
         private static string pendingDir
             = Path.Join(
@@ -43,8 +44,6 @@ namespace AdaCredit
 
         public static void Main(string[] args)
         {
-            Console.WriteLine("Sistema bancário Ada Credit");
-
             // make sure all necessary directories exist
             if (!Directory.Exists(pendingDir))
             {
@@ -58,6 +57,14 @@ namespace AdaCredit
             {
                 Directory.CreateDirectory(failedDir);
             }
+
+            userDB.Load();
+
+            Entities.User currUser = Login();
+
+            currUser.LastLogin = DateTime.Now;
+
+            userDB.Save();
 
             clientDB.Load();
 
@@ -76,7 +83,7 @@ namespace AdaCredit
                 });
 
             var userMenu = new ConsoleMenu(args, level: 1)
-                .Add("Cadastrar novo funcionário", AddUser)
+                .Add("Cadastrar novo funcionário", () => AddUser())
                 .Add("Alterar senha de funcionário existente", EditUser)
                 .Add("Desativar cadastro de funcionário existente", DeactivateUser)
                 .Add("Voltar", ConsoleMenu.Close)
@@ -122,13 +129,51 @@ namespace AdaCredit
                 .Add("Sair", () => Environment.Exit(0))
                 .Configure(config =>
                 {
-                    config.Title = $"Bem vindo {"usuario"}, escolha uma opção:";
+                    config.Title = $"Bem vindo {currUser.Username}, escolha uma opção:";
                     config.EnableWriteTitle = true;
                     config.EnableBreadcrumb = false;
                     config.WriteHeaderAction = () => { };
                 });
 
             mainMenu.Show();
+        }
+
+        private static Entities.User Login()
+        {
+            while (true)
+            {
+                Console.Clear();
+                Console.WriteLine("Sistema Ada Credit");
+                Console.Write("Nome de usuário: ");
+                string? name;
+                while ((name = Console.ReadLine()) is null) ;
+
+                Console.Write("Senha: ");
+                string pass = "";
+                ConsoleKey key;
+                do
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    key = keyInfo.Key;
+
+                    if (key == ConsoleKey.Backspace && pass.Length > 0) { pass = pass[0..^1]; }
+                    else if (!char.IsControl(keyInfo.KeyChar)) { pass += keyInfo.KeyChar; }
+                } while (key != ConsoleKey.Enter);
+                Console.WriteLine();
+                if (!userDB.Users.Any() && name == "user" && pass == "pass")
+                {
+                    Console.WriteLine("Primeiro login, por favor crie um novo usuário");
+                    System.Threading.Thread.Sleep(2000);
+                    return AddUser();
+                }
+                Entities.User? user;
+                if ((user = userDB.GetUser(name)) is not null && user.CheckPass(pass) && user.IsActive)
+                {
+                    return user;
+                }
+                Console.WriteLine("Credenciais inválidas, tente novamente");
+                System.Threading.Thread.Sleep(2000);
+            }
         }
 
         private static void AddClient()
@@ -142,6 +187,7 @@ namespace AdaCredit
             // personal info properties in the first place
 
             Console.Clear();
+            Console.WriteLine("Cadastro de cliente");
 
             string? name;
             Entities.CPF cpf;
@@ -149,7 +195,7 @@ namespace AdaCredit
             Console.Write("Nome do cliente: ");
             while ((name = Console.ReadLine()) is null || name == "")
             {
-                Console.WriteLine("Entrada inválida: ");
+                Console.Write("Entrada inválida: ");
             }
             Console.Write("CPF do cliente: ");
             while (!Entities.CPF.TryParse(Console.ReadLine(), out cpf))
@@ -166,24 +212,19 @@ namespace AdaCredit
         private static void PrintClient()
         {
             Console.Clear();
+            Console.WriteLine("Consulta de cliente");
 
             uint account;
             Console.Write("Número da conta: ");
             string? input;
+            Entities.Client? client = null;
             while (
                 (input = Console.ReadLine()) is null ||
                 !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
-                account > 999_999)
+                account > 999_999 ||
+                (client = clientDB.GetClient(1, account)) is null)
             {
                 Console.Write("Entrada inválida: ");
-            }
-            var client = clientDB.GetClient(1, account);
-            if (client is null)
-            {
-                Console.WriteLine("Cliente não encontrado");
-                Console.WriteLine("Pressione qualquer tecla para continuar");
-                Console.ReadKey();
-                return;
             }
             Console.WriteLine(client);
             Console.WriteLine("Pressione qualquer tecla para continuar");
@@ -193,24 +234,19 @@ namespace AdaCredit
         private static void EditClient()
         {
             Console.Clear();
+            Console.WriteLine("Alteração de cliente");
 
             uint account;
             Console.Write("Número da conta: ");
             string? input;
+            Entities.Client? client = null;
             while (
                 (input = Console.ReadLine()) is null ||
                 !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
-                account > 999_999)
+                account > 999_999 ||
+                (client = clientDB.GetClient(1, account)) is null)
             {
                 Console.Write("Entrada inválida: ");
-            }
-            var client = clientDB.GetClient(1, account);
-            if (client is null)
-            {
-                Console.WriteLine("Cliente não encontrado");
-                Console.WriteLine("Pressione qualquer tecla para continuar");
-                Console.ReadKey();
-                return;
             }
             // again there must be a better way to do
             // this with reflection
@@ -257,24 +293,19 @@ namespace AdaCredit
         private static void DeactivateClient()
         {
             Console.Clear();
+            Console.WriteLine("Desativar cliente");
 
             uint account;
             Console.Write("Número da conta: ");
             string? input;
+            Entities.Client? client = null;
             while (
                 (input = Console.ReadLine()) is null ||
                 !uint.TryParse(string.Concat(input.Where(Char.IsDigit).ToArray()), out account) ||
-                account > 999_999)
+                account > 999_999 ||
+                (client = clientDB.GetClient(1, account)) is null)
             {
                 Console.Write("Entrada inválida: ");
-            }
-            var client = clientDB.GetClient(1, account);
-            if (client is null)
-            {
-                Console.WriteLine("Cliente não encontrado");
-                Console.WriteLine("Pressione qualquer tecla para continuar");
-                Console.ReadKey();
-                return;
             }
             client.Deactivate();
             clientDB.Save();
@@ -283,37 +314,153 @@ namespace AdaCredit
             Console.ReadKey();
         }
 
-        private static void AddUser()
+        private static Entities.User AddUser()
         {
             Console.Clear();
+            Console.WriteLine("Cadastro de usuário");
 
-            string? user, pass, confirm;
+            string? name;
+            Entities.User? user = null;
             Console.Write("Nome de usuário: ");
-            while ((user = Console.ReadLine()) is null || user == "")
+            while ((name = Console.ReadLine()) is null ||
+                    name == "" ||
+                    (user = userDB.GetUser(name)) is not null)
             {
-                Console.WriteLine("Entrada inválida: ");
+                if (user is not null)
+                {
+                    Console.WriteLine("Usuário já cadastrado");
+                }
+                Console.Write("Entrada inválida: ");
             }
 
-            Console.Write("Senha: ");
-            while ((pass = Console.ReadLine()) is null)
+            string pass, confirm;
+            while (true)
             {
-                Console.WriteLine("Entrada inválida: ");
+                ConsoleKey key;
+
+                Console.Write("Senha: ");
+                pass = "";
+                do
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    key = keyInfo.Key;
+
+                    if (key == ConsoleKey.Backspace && pass.Length > 0) { pass = pass[0..^1]; }
+                    else if (!char.IsControl(keyInfo.KeyChar)) { pass += keyInfo.KeyChar; }
+                } while (key != ConsoleKey.Enter);
+                Console.WriteLine();
+                Console.Write("Confirme a senha: ");
+
+                confirm = "";
+                do
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    key = keyInfo.Key;
+
+                    if (key == ConsoleKey.Backspace && confirm.Length > 0) { confirm = confirm[0..^1]; }
+                    else if (!char.IsControl(keyInfo.KeyChar)) { confirm += keyInfo.KeyChar; }
+                } while (key != ConsoleKey.Enter);
+                Console.WriteLine();
+                if (confirm == pass) { break; }
+                {
+                    Console.WriteLine("Senhas diferentes, tente novamente");
+                }
             }
 
-            Console.Write("Confirme a senha: ");
-            while ((confirm = Console.ReadLine()) is null && confirm != pass)
-            {
-                Console.WriteLine("Entrada inválida: ");
-            }
+            user = userDB.NewUser(name);
+            if (user is null) { throw new NullReferenceException(); }
+            user.ChangePass(pass);
+
+            userDB.Save();
 
             Console.WriteLine("Usuário cadastrado com sucesso");
             Console.WriteLine("Pressione qualquer tecla para continuar");
             Console.ReadKey();
+
+            return user;
         }
 
-        private static void EditUser() { }
+        private static void EditUser()
+        {
+            Console.Clear();
+            Console.WriteLine("Alteração de senha");
 
-        private static void DeactivateUser() { }
+            string? name;
+            Entities.User? user = null;
+            Console.Write("Nome de usuário: ");
+            while ((name = Console.ReadLine()) is null ||
+                    name == "" ||
+                    (user = userDB.GetUser(name)) is null)
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+
+            string pass, confirm;
+            while (true)
+            {
+                ConsoleKey key;
+
+                Console.Write("Senha: ");
+                pass = "";
+                do
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    key = keyInfo.Key;
+
+                    if (key == ConsoleKey.Backspace && pass.Length > 0) { pass = pass[0..^1]; }
+                    else if (!char.IsControl(keyInfo.KeyChar)) { pass += keyInfo.KeyChar; }
+                } while (key != ConsoleKey.Enter);
+                Console.WriteLine();
+                Console.Write("Confirme a senha: ");
+
+                confirm = "";
+                do
+                {
+                    var keyInfo = Console.ReadKey(intercept: true);
+                    key = keyInfo.Key;
+
+                    if (key == ConsoleKey.Backspace && confirm.Length > 0) { confirm = confirm[0..^1]; }
+                    else if (!char.IsControl(keyInfo.KeyChar)) { confirm += keyInfo.KeyChar; }
+                } while (key != ConsoleKey.Enter);
+                Console.WriteLine();
+                if (confirm == pass) { break; }
+                {
+                    Console.WriteLine("Senhas diferentes, tente novamente");
+                }
+            }
+
+            user.ChangePass(pass);
+
+            userDB.Save();
+
+            Console.WriteLine("Senha alterada com sucesso");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
+        }
+
+        private static void DeactivateUser()
+        {
+            Console.Clear();
+            Console.WriteLine("Desativar funcionário");
+
+            string? name;
+            Entities.User? user = null;
+            Console.Write("Nome de usuário: ");
+            while ((name = Console.ReadLine()) is null ||
+                    name == "" ||
+                    (user = userDB.GetUser(name)) is null)
+            {
+                Console.WriteLine("Entrada inválida: ");
+            }
+
+            user.Deactivate();
+
+            userDB.Save();
+
+            Console.WriteLine("Usuário desativado com sucesso");
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
+        }
 
         private static void ProcessTransactions()
         {
@@ -459,6 +606,7 @@ namespace AdaCredit
         private static void PrintActiveClients()
         {
             Console.Clear();
+            Console.WriteLine("Relatório de clientes ativos");
             foreach (var client in clientDB.Clients.Where(c => c.IsActive))
             {
                 Console.WriteLine(client);
@@ -470,6 +618,7 @@ namespace AdaCredit
         private static void PrintInactiveClients()
         {
             Console.Clear();
+            Console.WriteLine("Relatório de clientes inativos");
             foreach (var client in clientDB.Clients.Where(c => !c.IsActive))
             {
                 Console.WriteLine(client);
@@ -478,11 +627,22 @@ namespace AdaCredit
             Console.ReadKey();
         }
 
-        private static void PrintActiveUsers() { }
+        private static void PrintActiveUsers()
+        {
+            Console.Clear();
+            Console.WriteLine("Relatório de funcionários ativos");
+            foreach (var user in userDB.Users.Where(u => u.IsActive))
+            {
+                Console.WriteLine(user);
+            }
+            Console.WriteLine("Pressione qualquer tecla para continuar");
+            Console.ReadKey();
+        }
 
         private static void PrintFailures()
         {
             Console.Clear();
+            Console.WriteLine("Relatório de transações com falha");
             foreach (var file in new DirectoryInfo(failedDir).EnumerateFiles())
             {
                 DateOnly date;
